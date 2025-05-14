@@ -2,7 +2,7 @@
 
 Современный веб-инструмент для обработки, анализа и визуализации CSV данных.
 
-![CSV Data Processor](https://placehold.co/600x400?text=CSV+Data+Processor)
+![CSV Data Processor](output.gif)
 
 ## Возможности
 
