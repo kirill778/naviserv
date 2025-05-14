@@ -13,18 +13,23 @@ import ChartWidget from '../components/dashboard/ChartWidget';
 import MetricWidget from '../components/dashboard/MetricWidget';
 import TableWidget from '../components/dashboard/TableWidget';
 
+// Интерфейс для элементов виджетов
+interface Widget {
+  i: string;
+  type: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  title: string;
+}
+
 // Configure responsive grid
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 const DashboardPage: React.FC = () => {
-  // Mock widgets config
-  const [widgets, setWidgets] = useState([
-    { i: 'chart1', type: 'bar', x: 0, y: 0, w: 6, h: 8, title: 'Sales by Quarter' },
-    { i: 'chart2', type: 'line', x: 6, y: 0, w: 6, h: 8, title: 'Revenue Trends' },
-    { i: 'metric1', type: 'metric', x: 0, y: 8, w: 3, h: 4, title: 'Total Revenue' },
-    { i: 'metric2', type: 'metric', x: 3, y: 8, w: 3, h: 4, title: 'Avg. Order Value' },
-    { i: 'table1', type: 'table', x: 6, y: 8, w: 6, h: 8, title: 'Top Products' },
-  ]);
+  // Пустой список виджетов
+  const [widgets, setWidgets] = useState<Widget[]>([]);
 
   // Add new widget
   const addWidget = (type: string) => {
@@ -52,7 +57,7 @@ const DashboardPage: React.FC = () => {
   };
 
   // Render widget based on type
-  const renderWidget = (widget: any) => {
+  const renderWidget = (widget: Widget) => {
     switch (widget.type) {
       case 'bar':
       case 'line':

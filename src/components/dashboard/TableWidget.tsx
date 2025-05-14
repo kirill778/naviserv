@@ -8,6 +8,14 @@ import {
   Trash2
 } from 'lucide-react';
 
+// Определяем интерфейс для данных таблицы
+interface TableRow {
+  id: number;
+  product: string;
+  sales: number;
+  revenue: string;
+}
+
 interface TableWidgetProps {
   title: string;
   onDelete: () => void;
@@ -16,14 +24,8 @@ interface TableWidgetProps {
 const TableWidget: React.FC<TableWidgetProps> = ({ title, onDelete }) => {
   const [showMenu, setShowMenu] = useState(false);
   
-  // Mock data for table
-  const tableData = [
-    { id: 1, product: 'Product A', sales: 1234, revenue: '$12,340' },
-    { id: 2, product: 'Product B', sales: 856, revenue: '$8,560' },
-    { id: 3, product: 'Product C', sales: 765, revenue: '$7,650' },
-    { id: 4, product: 'Product D', sales: 543, revenue: '$5,430' },
-    { id: 5, product: 'Product E', sales: 432, revenue: '$4,320' },
-  ];
+  // Пустой набор данных
+  const tableData: TableRow[] = [];
   
   const columns = [
     { key: 'product', label: 'Product' },
@@ -94,6 +96,13 @@ const TableWidget: React.FC<TableWidgetProps> = ({ title, onDelete }) => {
                 <td className="py-2 px-3 border-b border-gray-100 text-right">{row.revenue}</td>
               </tr>
             ))}
+            {tableData.length === 0 && (
+              <tr>
+                <td colSpan={columns.length} className="py-8 text-center text-gray-400">
+                  No data available
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

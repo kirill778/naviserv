@@ -2,15 +2,18 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileSpreadsheet, BarChart4, FileUp, Clock } from 'lucide-react';
 
+// Определяем интерфейс для файлов
+interface RecentFile {
+  id: number;
+  name: string;
+  modified: string;
+}
+
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   
-  // Mock recent files data
-  const recentFiles = [
-    { id: 1, name: 'Sales_Data_2024.csv', modified: '2 hours ago' },
-    { id: 2, name: 'Customer_Analysis.csv', modified: 'Yesterday' },
-    { id: 3, name: 'Product_Inventory.csv', modified: '3 days ago' },
-  ];
+  // Пустой массив недавних файлов
+  const recentFiles: RecentFile[] = [];
 
   return (
     <div className="max-w-7xl mx-auto">

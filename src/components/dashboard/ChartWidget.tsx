@@ -10,16 +10,16 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-// Sample data for charts
-const chartData = [
-  { name: 'Jan', value: 4000, pv: 2400, amt: 2400 },
-  { name: 'Feb', value: 3000, pv: 1398, amt: 2210 },
-  { name: 'Mar', value: 2000, pv: 9800, amt: 2290 },
-  { name: 'Apr', value: 2780, pv: 3908, amt: 2000 },
-  { name: 'May', value: 1890, pv: 4800, amt: 2181 },
-  { name: 'Jun', value: 2390, pv: 3800, amt: 2500 },
-  { name: 'Jul', value: 3490, pv: 4300, amt: 2100 },
-];
+// Тип данных для чартов
+interface ChartDataItem {
+  name: string;
+  value: number;
+  pv?: number;
+  amt?: number;
+}
+
+// Пустой набор данных
+const chartData: ChartDataItem[] = [];
 
 // Colors for pie chart
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
@@ -35,6 +35,14 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({ type, title, onDelete }) => {
 
   // Render chart based on type
   const renderChart = () => {
+    if (chartData.length === 0) {
+      return (
+        <div className="h-full flex items-center justify-center text-gray-400">
+          <p>No data available</p>
+        </div>
+      );
+    }
+    
     switch (type) {
       case 'bar':
         return (
