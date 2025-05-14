@@ -7,19 +7,20 @@ interface CsvFileAttributes {
   id: number;
   name: string;
   originalName: string;
-  path: string;
+  path?: string;
   size: number;
   mimeType: string;
   userId: number;
   columnHeaders: string[];
   rowCount: number;
+  data?: any[][];
   processedAt: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 // Определяем атрибуты, которые могут быть нулевыми при создании
-interface CsvFileCreationAttributes extends Optional<CsvFileAttributes, 'id' | 'processedAt' | 'createdAt' | 'updatedAt'> {}
+interface CsvFileCreationAttributes extends Optional<CsvFileAttributes, 'id' | 'processedAt' | 'createdAt' | 'updatedAt' | 'path' | 'data'> {}
 
 // Создаем класс модели файла CSV
 class CsvFile extends Model<CsvFileAttributes, CsvFileCreationAttributes> implements CsvFileAttributes {
@@ -32,6 +33,7 @@ class CsvFile extends Model<CsvFileAttributes, CsvFileCreationAttributes> implem
   public userId!: number;
   public columnHeaders!: string[];
   public rowCount!: number;
+  public data?: any[][];
   public processedAt!: Date | null;
 
   public readonly createdAt!: Date;
@@ -56,7 +58,7 @@ CsvFile.init(
     },
     path: {
       type: DataTypes.STRING(500),
-      allowNull: false,
+      allowNull: true,
     },
     size: {
       type: DataTypes.INTEGER,
@@ -83,6 +85,10 @@ CsvFile.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
+    },
+    data: {
+      type: DataTypes.JSON,
+      allowNull: true,
     },
     processedAt: {
       type: DataTypes.DATE,

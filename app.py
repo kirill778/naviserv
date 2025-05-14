@@ -119,6 +119,11 @@ async def startup_event():
         init_db()
         print("База данных инициализирована успешно")
         
+        # Выполняем миграции
+        from server.migrations import run_migrations
+        run_migrations()
+        print("Миграции выполнены успешно")
+        
         # Создаем тестового пользователя admin, если его нет
         db = next(get_db())
         user_count = db.query(models.User).count()

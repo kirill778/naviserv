@@ -56,6 +56,26 @@ services:
     networks:
       - app-network
 
+  # Фронтенд для разработки с горячей перезагрузкой
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: csv-data-processor-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./src:/app/src
+      - ./index.html:/app/index.html
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:3001
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge

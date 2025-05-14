@@ -33,12 +33,13 @@ class CsvFile(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     original_name = Column(String(255), nullable=False)
-    path = Column(String(500), nullable=False)
+    path = Column(String(500), nullable=True)  # Сделаем путь опциональным
     size = Column(Integer, nullable=False)
     mime_type = Column(String(100), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     column_headers = Column(ARRAY(String), nullable=False, default=list)
     row_count = Column(Integer, nullable=False, default=0)
+    data = Column(JSON, nullable=True)  # Добавляем JSON-поле для хранения данных CSV
     processed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -25,6 +25,7 @@ function App() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<HomePage />} />
           <Route path="spreadsheet" element={<SpreadsheetPage />} />
+          <Route path="spreadsheet/:fileId" element={<SpreadsheetPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="settings" element={<SettingsPage />} />
             </Route>

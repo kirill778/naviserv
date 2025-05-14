@@ -19,8 +19,8 @@ const AuthChecker: React.FC<AuthCheckerProps> = ({ children }) => {
           const data = await AuthService.getCurrentUser();
           
           // Update user information
-          if (data.user) {
-            login(token, data.user);
+          if (data && data.id) {
+            login(token, data);
           } else {
             // If no user returned, token might be invalid
             logout();

@@ -1,26 +1,77 @@
-# Docker для CSV Data Processor
+# Docker Configuration
 
-Проект настроен для работы в Docker. Ниже приведены инструкции по использованию Docker для разработки и деплоя.
+## Обновления (Май 2025)
 
-## Режим разработки
+Последние обновления Docker-конфигурации включают:
 
-Для запуска приложения в режиме разработки с горячей перезагрузкой:
+1. **Полный стек в одном файле** - Теперь все компоненты системы (база данных, API, front-end) запускаются через единый файл `docker-compose.python.yml`.
+
+2. **Фронтенд в контейнере** - Добавлен контейнер для фронтенда с горячей перезагрузкой.
+
+3. **Улучшена конфигурация томов** - Оптимизированы тома для более эффективной разработки.
+
+4. **Переменные окружения** - Добавлен `VITE_API_URL` для более гибкой настройки API URL.
+
+## Основные конфигурационные файлы
+
+- `docker-compose.python.yml` - Основной файл для запуска полного стека (PostgreSQL, PgAdmin, API, Frontend)
+- `Dockerfile.python` - Сборка Python бэкенда
+- `Dockerfile.dev` - Сборка фронтенда с горячей перезагрузкой
+- `Dockerfile` - Продакшн-версия фронтенда
+
+## Запуск приложения
+
+### Запуск полного стека
 
 ```bash
-docker-compose up app-dev
+docker-compose -f docker-compose.python.yml up -d
 ```
 
-Приложение будет доступно по адресу http://localhost:5173.
+После запуска:
+- Фронтенд: http://localhost:5173
+- API: http://localhost:3001
+- pgAdmin: http://localhost:5050 (email: admin@example.com, password: admin)
+- PostgreSQL: localhost:5432
 
-## Продакшн режим
-
-Для сборки и запуска приложения в продакшн режиме:
+### Запуск только базы данных
 
 ```bash
-docker-compose up app-prod
+docker-compose -f docker-compose.db.yml up -d
 ```
 
-Приложение будет доступно по адресу http://localhost.
+### Запуск только фронтенда в режиме разработки
+
+```bash
+docker-compose -f docker-compose.yml up app-dev
+```
+
+### Остановка контейнеров
+
+```bash
+docker-compose -f docker-compose.python.yml down
+```
+
+## Полезные команды
+
+### Проверка статуса контейнеров
+```bash
+docker ps
+```
+
+### Перезапуск контейнера API
+```bash
+docker restart csv-data-processor-api
+```
+
+### Копирование файлов в контейнер
+```bash
+docker cp server/routes/csv_files.py csv-data-processor-api:/app/server/routes/
+```
+
+### Просмотр логов контейнера
+```bash
+docker logs csv-data-processor-api
+```
 
 ## Сборка Docker образов вручную
 
@@ -36,12 +87,6 @@ docker run -p 5173:5173 -v $(pwd):/app -v /app/node_modules csv-data-processor-d
 ```bash
 docker build -t csv-data-processor .
 docker run -p 80:80 csv-data-processor
-```
-
-## Остановка контейнеров
-
-```bash
-docker-compose down
 ```
 
 ## Особенности и ограничения

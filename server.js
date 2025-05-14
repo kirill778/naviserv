@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { Sequelize } from 'sequelize';
 import authRoutes from './server/routes/auth.routes.js';
+import csvFilesRoutes from './server/routes/csvFiles.routes.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -45,10 +46,10 @@ const PORT = process.env.PORT || 3001;
 
 // Настраиваем middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.CLIENT_URL 
-    : `http://localhost:${process.env.CLIENT_PORT || 5173}`,
-  credentials: true
+  origin: '*', // Allow all origins for testing
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explicitly specify all methods
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -58,8 +59,15 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to CSV Data Processor API' });
 });
 
+// Simple test route for POST requests
+app.post('/test-post', (req, res) => {
+  console.log('Test POST route hit, body:', req.body);
+  res.json({ message: 'POST request received', body: req.body });
+});
+
 // Подключаем маршруты
 app.use('/api/auth', authRoutes);
+app.use('/api/csv-files', csvFilesRoutes);
 
 // В случае проблем с аутентификацией, используем запасной вариант
 app.post('/api/auth/login-fallback', (req, res) => {

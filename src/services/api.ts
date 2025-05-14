@@ -1,6 +1,7 @@
 import { useAuthStore } from '../stores/authStore';
+import config from '../config';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = `${config.apiUrl}/api`;
 
 // Helper function to create fetch options with authorization header
 const createFetchOptions = (method: string, body?: any) => {
@@ -27,6 +28,9 @@ const createFetchOptions = (method: string, body?: any) => {
 
   return options;
 };
+
+// Экспортируем API_URL для использования в других частях приложения
+export { API_URL };
 
 export const AuthService = {
   // Login user

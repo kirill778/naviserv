@@ -26,8 +26,15 @@ const LoginPage: React.FC = () => {
 
     try {
       const data = await AuthService.login(username, password);
-      login(data.token, data.user);
-      navigate('/');
+      const token = data.token || data.access_token;
+      const user = data.user;
+
+      if (token && user) {
+        login(token, user);
+        navigate('/');
+      } else {
+        setError('Login failed: Invalid response from server.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

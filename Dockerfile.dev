@@ -2,11 +2,19 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Копируем файлы зависимостей
+# Копируем файлы зависимостей и конфигурации
 COPY package.json package-lock.json ./
+COPY tsconfig*.json ./
+COPY vite.config.ts ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+COPY index.html ./
 
 # Устанавливаем зависимости
 RUN npm ci
+
+# Копируем исходный код
+COPY src/ ./src/
 
 # Устанавливаем права на папку node_modules
 RUN mkdir -p node_modules/.vite && chmod -R 777 node_modules/.vite
@@ -14,6 +22,7 @@ RUN mkdir -p node_modules/.vite && chmod -R 777 node_modules/.vite
 # Настраиваем порт для Vite
 ENV VITE_PORT=5173
 ENV HOST=0.0.0.0
+ENV VITE_API_URL=http://localhost:3001
 
 # Открываем порт
 EXPOSE 5173
