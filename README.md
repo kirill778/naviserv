@@ -28,8 +28,8 @@
 
 ```bash
 # Клонировать репозиторий
-git clone https://github.com/yourusername/csv-data-processor.git
-cd csv-data-processor
+git clone https://github.com/kirill778/naviserv.git
+cd naviserv
 
 # Установить зависимости
 npm install
