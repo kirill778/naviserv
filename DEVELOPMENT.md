@@ -283,6 +283,157 @@
      }, [activeCell, updateCellValue]);
      ```
 
+#### Детали реализации (21.05.2024):
+
+1. **Поддержка диапазонов ячеек в формулах (A1:A3):**
+   - Добавлена функция `expandCellRange` для преобразования диапазона в список ячеек:
+     ```typescript
+     export const expandCellRange = (range: string): string[] => {
+       const parts = range.split(':');
+       if (parts.length !== 2) {
+         throw new Error(`Invalid range: ${range}`);
+       }
+       
+       const [start, end] = parts;
+       
+       if (!isValidCellRef(start) || !isValidCellRef(end)) {
+         throw new Error(`Invalid cell references in range: ${range}`);
+       }
+       
+       const [startRow, startCol] = cellRefToIndices(start);
+       const [endRow, endCol] = cellRefToIndices(end);
+       
+       const startRowIdx = Math.min(startRow, endRow);
+       const endRowIdx = Math.max(startRow, endRow);
+       const startColIdx = Math.min(startCol, endCol);
+       const endColIdx = Math.max(startCol, endCol);
+       
+       const cellRefs: string[] = [];
+       
+       for (let row = startRowIdx; row <= endRowIdx; row++) {
+         for (let col = startColIdx; col <= endColIdx; col++) {
+           cellRefs.push(indicesToCellRef(row, col));
+         }
+       }
+       
+       return cellRefs;
+     };
+     ```
+
+2. **Реализация функции SUM и поддержки диапазонов:**
+   - Добавлена функция `processBuiltInFunctions` для обработки встроенных функций:
+     ```typescript
+     export const processBuiltInFunctions = (formula: string, data: any[][]): string => {
+       // Handle SUM function
+       const sumRegex = /SUM\s*\(\s*([^)]+)\s*\)/i;
+       let match = formula.match(sumRegex);
+       
+       if (match) {
+         const args = match[1].split(/[;,]/);
+         let sum = 0;
+         
+         for (const arg of args) {
+           const trimmedArg = arg.trim();
+           
+           // Check if it's a range (contains :)
+           if (trimmedArg.includes(':')) {
+             try {
+               const cellRefs = expandCellRange(trimmedArg);
+               for (const cellRef of cellRefs) {
+                 const [row, col] = cellRefToIndices(cellRef);
+                 const value = data[row]?.[col];
+                 
+                 if (value !== undefined && value !== null && value !== '') {
+                   const num = parseFloat(value);
+                   if (!isNaN(num)) {
+                     sum += num;
+                   }
+                 }
+               }
+             } catch (error) {
+               console.error('Error processing range:', error);
+               return '#ERROR';
+             }
+           } else if (isValidCellRef(trimmedArg)) {
+             // It's a single cell reference
+             try {
+               const [row, col] = cellRefToIndices(trimmedArg);
+               const value = data[row]?.[col];
+               
+               if (value !== undefined && value !== null && value !== '') {
+                 const num = parseFloat(value);
+                 if (!isNaN(num)) {
+                   sum += num;
+                 }
+               }
+             } catch (error) {
+               console.error('Error processing cell reference:', error);
+               return '#ERROR';
+             }
+           } else {
+             // It might be a number
+             const num = parseFloat(trimmedArg);
+             if (!isNaN(num)) {
+               sum += num;
+             }
+           }
+         }
+         
+         return sum.toString();
+       }
+       
+       return formula; // Return unchanged if no functions matched
+     };
+     ```
+
+3. **Обновление механизма извлечения ссылок на ячейки:**
+   - Расширена функция `extractCellRefs` для распознавания диапазонов:
+     ```typescript
+     export const extractCellRefs = (formula: string): string[] => {
+       const cellRefPattern = /([A-Z]+\d+)/g;
+       const matches = formula.match(cellRefPattern) || [];
+       
+       // Check for potential range expressions (A1:B3)
+       const ranges: string[] = [];
+       const singleCellRefs = [...matches];
+       
+       // Look for cell ranges using regex
+       for (let i = 0; i < singleCellRefs.length - 1; i++) {
+         const current = singleCellRefs[i];
+         const next = singleCellRefs[i + 1];
+         
+         // Check if they appear as a range in the formula (with a colon between them)
+         if (formula.includes(`${current}:${next}`)) {
+           try {
+             ranges.push(`${current}:${next}`);
+           } catch (error) {
+             console.error('Error identifying range:', error);
+           }
+         }
+       }
+       
+       // Expand the ranges and add them to the result
+       const result = [...matches]; // Start with individual cell references
+       
+       for (const range of ranges) {
+         try {
+           const expandedRefs = expandCellRange(range);
+           result.push(...expandedRefs);
+         } catch (error) {
+           console.error('Error expanding range:', error);
+         }
+       }
+       
+       // Remove duplicates and return
+       return [...new Set(result)];
+     };
+     ```
+
+4. **Создание отдельной документации по формулам:**
+   - Создан файл `FORMULAS.md` с подробным описанием работы с формулами
+   - Добавлены примеры использования функций и диапазонов ячеек
+   - Описаны все поддерживаемые операции и функции
+
 ## Решенные проблемы
 
 ### Проблемы с аутентификацией

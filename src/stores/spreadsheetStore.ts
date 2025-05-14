@@ -29,6 +29,7 @@ interface SpreadsheetState extends FormulaModeState {
   startFormulaMode: (rowIndex: number, colIndex: number, initialValue?: string) => void;
   selectCellForFormula: (selectedRow: number, selectedCol: number) => void;
   updateCurrentFormulaValue: (value: string, cursorPosition: number | null) => void;
+  insertFunctionTemplate: (functionName: string) => void;
   cancelFormulaMode: () => void;
   // confirmFormula - будет частью updateCellValue или нового действия, если потребуется
 }
@@ -148,6 +149,59 @@ const useSpreadsheetStore = create<SpreadsheetState>((set, get) => ({
     if (formulaSourceCell && formulaSourceCell.row !== null && formulaSourceCell.col !== null) {
       get().updateCellValue(formulaSourceCell.row, formulaSourceCell.col, value);
     }
+  },
+
+  insertFunctionTemplate: (functionName) => {
+    const { formulaSourceCell, currentFormulaValue, formulaCursorPosition, activeCell, editingCell } = get();
+    let targetRow: number | null = null;
+    let targetCol: number | null = null;
+    let currentVal = '';
+    let cursorPos = 0;
+
+    if (formulaSourceCell && editingCell && formulaSourceCell.row === editingCell.row && formulaSourceCell.col === editingCell.col) {
+      // Мы уже в режиме редактирования формулы
+      targetRow = formulaSourceCell.row;
+      targetCol = formulaSourceCell.col;
+      currentVal = currentFormulaValue;
+      cursorPos = formulaCursorPosition !== null ? formulaCursorPosition : currentVal.length;
+    } else if (activeCell.row !== null && activeCell.col !== null) {
+      // Режим формулы не активен, или активен для другой ячейки.
+      // Начинаем новую формулу в активной ячейке.
+      targetRow = activeCell.row;
+      targetCol = activeCell.col;
+      const existingValue = get().getCellValue(targetRow, targetCol) || '';
+      if (existingValue.startsWith('=')) {
+        currentVal = existingValue;
+      } else {
+        currentVal = '=' + existingValue; // Добавляем = если его не было
+      }
+      cursorPos = currentVal.length;
+      // Активируем режим формулы для этой ячейки
+      get().startFormulaMode(targetRow, targetCol, currentVal);
+       // Обновляем currentVal и cursorPos после startFormulaMode, т.к. они могли измениться
+      currentVal = get().currentFormulaValue;
+      cursorPos = get().formulaCursorPosition !== null ? get().formulaCursorPosition! : currentVal.length;
+    }
+
+    if (targetRow === null || targetCol === null) return; // Некуда вставлять
+
+    const functionText = functionName + '()'; // Вставляем NAME()
+    const newValue = 
+      currentVal.substring(0, cursorPos) + 
+      functionText + 
+      currentVal.substring(cursorPos);
+    
+    const newCursorPos = cursorPos + functionName.length + 1; // Ставим курсор внутрь скобок NAME( | )
+
+    set({
+      currentFormulaValue: newValue,
+      formulaCursorPosition: newCursorPos,
+      isFormulaSelectionMode: true, // Убеждаемся, что режим активен
+      formulaSourceCell: {row: targetRow, col: targetCol }, // Устанавливаем/подтверждаем ячейку-источник
+      activeCell: {row: targetRow, col: targetCol },
+      editingCell: {row: targetRow, col: targetCol },
+    });
+    get().updateCellValue(targetRow, targetCol, newValue);
   },
 
   cancelFormulaMode: () => {
