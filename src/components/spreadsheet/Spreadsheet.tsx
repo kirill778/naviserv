@@ -3,10 +3,48 @@ import Cell from './Cell';
 import useSpreadsheetStore from '../../stores/spreadsheetStore';
 import { evaluateFormula } from '../../utils/formulaUtils';
 
+// Константы для размеров таблицы
+const DEFAULT_ROW_COUNT = 100; // Увеличиваем начальное количество строк
+const DEFAULT_COL_COUNT = 26; // Увеличиваем начальное количество столбцов
+const MIN_VISIBLE_ROWS = 100; // Минимальное количество видимых строк
+const MIN_VISIBLE_COLS = 26; // Минимальное количество видимых столбцов
+
 const Spreadsheet: React.FC = () => {
   const { data, headers, activeCell, setActiveCell, updateCellValue } = useSpreadsheetStore();
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const [visibleRows, setVisibleRows] = useState(DEFAULT_ROW_COUNT);
+  const [visibleCols, setVisibleCols] = useState(DEFAULT_COL_COUNT);
+
+  // Обработчик прокрутки для динамического добавления строк/столбцов
+  useEffect(() => {
+    const handleScroll = () => {
+      if (tableRef.current) {
+        const { scrollTop, scrollHeight, clientHeight, scrollLeft, scrollWidth, clientWidth } = tableRef.current;
+        
+        // Если прокрутили близко к концу по вертикали, добавляем еще строки
+        if (scrollTop + clientHeight > scrollHeight - 200) {
+          setVisibleRows(prev => prev + 20);
+        }
+        
+        // Если прокрутили близко к концу по горизонтали, добавляем еще столбцы
+        if (scrollLeft + clientWidth > scrollWidth - 200) {
+          setVisibleCols(prev => prev + 5);
+        }
+      }
+    };
+    
+    const tableElement = tableRef.current;
+    if (tableElement) {
+      tableElement.addEventListener('scroll', handleScroll);
+    }
+    
+    return () => {
+      if (tableElement) {
+        tableElement.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, []);
 
   // Generate column labels (A, B, C, ..., Z, AA, AB, ...)
   const generateColumnLabel = (index: number): string => {
@@ -43,8 +81,25 @@ const Spreadsheet: React.FC = () => {
     return value;
   };
 
-  // Generate empty rows if data is empty
-  const displayData = data.length > 0 ? data : Array(15).fill(Array(10).fill(''));
+  // Определяем количество отображаемых строк и столбцов
+  // Учитываем имеющиеся данные и минимально необходимое количество
+  const effectiveRows = Math.max(
+    visibleRows,
+    data.length > 0 ? data.length : MIN_VISIBLE_ROWS
+  );
+  
+  const effectiveCols = Math.max(
+    visibleCols,
+    headers.length > 0 ? headers.length : MIN_VISIBLE_COLS
+  );
+
+  // Создаем "бесконечную" таблицу
+  const displayData = data.length > 0 
+    ? Array.from({ length: effectiveRows }, (_, rowIdx) => 
+        Array.from({ length: effectiveCols }, (_, colIdx) => 
+          data[rowIdx]?.[colIdx] || ''))
+    : Array.from({ length: effectiveRows }, () => 
+        Array.from({ length: effectiveCols }, () => ''));
 
   return (
     <div 
@@ -54,29 +109,18 @@ const Spreadsheet: React.FC = () => {
     >
       <div className="sticky top-0 z-10 flex">
         <div className="w-10 h-10 bg-gray-100 border-b border-r border-gray-300 flex items-center justify-center text-gray-500 font-medium"></div>
-        {headers.length > 0 ? (
-          headers.map((header, index) => (
-            <div 
-              key={index} 
-              className="min-w-[100px] w-[100px] h-10 bg-gray-100 border-b border-r border-gray-300 flex items-center justify-center text-gray-700 font-medium"
-            >
-              {header || generateColumnLabel(index)}
-            </div>
-          ))
-        ) : (
-          Array(10).fill(0).map((_, index) => (
-            <div 
-              key={index} 
-              className="min-w-[100px] w-[100px] h-10 bg-gray-100 border-b border-r border-gray-300 flex items-center justify-center text-gray-700 font-medium"
-            >
-              {generateColumnLabel(index)}
-            </div>
-          ))
-        )}
+        {Array(effectiveCols).fill(0).map((_, index) => (
+          <div 
+            key={index} 
+            className="min-w-[100px] w-[100px] h-10 bg-gray-100 border-b border-r border-gray-300 flex items-center justify-center text-gray-700 font-medium"
+          >
+            {headers[index] || generateColumnLabel(index)}
+          </div>
+        ))}
       </div>
       
       {displayData.map((row, rowIndex) => (
-        <div key={rowIndex} className="flex">
+        <div key={rowIndex} className="flex whitespace-nowrap">
           <div className="sticky left-0 w-10 min-w-[40px] h-10 bg-gray-100 border-b border-r border-gray-300 flex items-center justify-center text-gray-700 font-medium">
             {rowIndex + 1}
           </div>

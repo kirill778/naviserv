@@ -54,9 +54,16 @@ const Cell: React.FC<CellProps> = ({
     }
   };
 
-  // Handle blur
-  const handleBlur = () => {
+  // Handle blur without losing focus completely
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Предотвращаем потерю фокуса для пустых ячеек, сохраняя их видимыми
     onChange(inputValue);
+    
+    // Не теряем сразу фокус при клике внутри ячейки
+    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    
     onBlur();
   };
 

@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 
 interface Cell {
-  row: number;
-  col: number;
+  row: number | null;
+  col: number | null;
 }
 
 interface SpreadsheetState {
@@ -13,6 +13,7 @@ interface SpreadsheetState {
   setActiveCell: (row: number, col: number) => void;
   updateCellValue: (row: number, col: number, value: string) => void;
   getCellValue: (row: number, col: number) => string | null;
+  clearCell: (row: number, col: number) => void;
 }
 
 const useSpreadsheetStore = create<SpreadsheetState>((set, get) => ({
@@ -26,27 +27,23 @@ const useSpreadsheetStore = create<SpreadsheetState>((set, get) => ({
   
   updateCellValue: (row, col, value) => {
     set((state) => {
-      // Create a deep copy of the data
-      const newData = [...state.data];
+      // Создаем глубокую копию данных для предотвращения мутаций
+      const newData = [...state.data.map(row => [...row])];
       
-      // Ensure the row exists
+      // Убедимся, что строка существует
       if (!newData[row]) {
-        // If the row doesn't exist, create empty rows up to this index
+        // Если строки нет, создаем пустые строки до этого индекса
         for (let i = state.data.length; i <= row; i++) {
           newData[i] = [];
         }
       }
       
-      // Ensure the column exists
-      if (!newData[row][col]) {
-        // If the cell doesn't exist, create empty cells up to this index
-        for (let i = newData[row].length; i <= col; i++) {
-          newData[row][i] = '';
-        }
-      }
+      // Убедимся, что столбец существует в этой строке
+      const rowArray = newData[row];
       
-      // Update the cell value
-      newData[row][col] = value;
+      // Обновляем значение ячейки
+      // Устанавливаем значение даже если оно пустое - это поможет сохранить ячейки видимыми
+      rowArray[col] = value;
       
       return { data: newData };
     });
@@ -55,6 +52,20 @@ const useSpreadsheetStore = create<SpreadsheetState>((set, get) => ({
   getCellValue: (row, col) => {
     const state = get();
     return state.data[row]?.[col] || null;
+  },
+  
+  // Добавляем новый метод для очистки ячейки, который оставляет ее пустой, а не удаляет
+  clearCell: (row, col) => {
+    set((state) => {
+      if (!state.data[row] || state.data[row][col] === undefined) {
+        return state; // Ничего не меняем если ячейки нет
+      }
+      
+      const newData = [...state.data.map(row => [...row])];
+      newData[row][col] = ''; // Устанавливаем пустую строку вместо удаления
+      
+      return { data: newData };
+    });
   },
 }));
 

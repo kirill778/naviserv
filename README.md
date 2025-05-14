@@ -30,6 +30,13 @@
 - JWT аутентификация
 - Docker для контейнеризации
 
+## Документация
+
+- [README.md](README.md) - Основная документация проекта
+- [README.python.md](README.python.md) - Подробная информация о Python бэкенде
+- [README.docker.md](README.docker.md) - Дополнительная информация о Docker-настройке
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Журнал разработки с описанием процесса, решенных проблем и технических деталей реализации
+
 ## Начало работы
 
 ### Запуск полного стека (Python бэкенд)
@@ -49,8 +56,6 @@ docker-compose -f docker-compose.python.yml up -d
 - Фронтенд: http://localhost:5173
 - API: http://localhost:3001
 - pgAdmin (для управления БД): http://localhost:5050
-
-Подробная информация о Python бэкенде доступна в [README.python.md](README.python.md).
 
 ### Установка для фронтенд-разработки
 
@@ -103,8 +108,6 @@ docker-compose up app-prod
 docker-compose down
 ```
 
-Дополнительная информация о Docker-настройке доступна в [README.docker.md](README.docker.md).
-
 ## Использование
 
 1. **Импорт данных**: Загрузите CSV файл через кнопку "Import CSV" на главной странице или странице электронной таблицы
@@ -135,7 +138,17 @@ server/           # Python бэкенд
 ├── models/       # Модели данных для SQLAlchemy
 ├── routes/       # API эндпоинты
 └── database.py   # Настройка подключения к базе данных
+
+# Документация проекта
+README.md         # Основная документация
+README.python.md  # Документация Python бэкенда
+README.docker.md  # Документация Docker
+DEVELOPMENT.md    # Журнал разработки
 ```
+
+## Разработка
+
+Процесс разработки проекта, включая этапы, технические детали и решения возникших проблем, документирован в файле [DEVELOPMENT.md](DEVELOPMENT.md). Этот журнал регулярно обновляется с описанием новых изменений и улучшений в проекте.
 
 ## Лицензия
 
