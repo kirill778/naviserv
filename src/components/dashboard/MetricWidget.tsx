@@ -15,10 +15,10 @@ interface MetricWidgetProps {
 const MetricWidget: React.FC<MetricWidgetProps> = ({ title, onDelete }) => {
   const [showMenu, setShowMenu] = useState(false);
   
-  // Mock data - in a real app, this would come from the data source
-  const value = '$45,231';
-  const changePercent = 13.2;
-  const isPositive = changePercent > 0;
+  // В реальном приложении данные будут приходить извне
+  const value = '0';
+  const changePercent = 0;
+  const isPositive = changePercent >= 0;
   
   return (
     <div className="h-full bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden">
@@ -50,16 +50,22 @@ const MetricWidget: React.FC<MetricWidgetProps> = ({ title, onDelete }) => {
         </div>
       </div>
       <div className="flex-1 flex flex-col items-center justify-center p-4">
-        <div className="text-3xl font-bold text-gray-800">{value}</div>
-        <div className={`flex items-center mt-2 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-          {isPositive ? (
-            <TrendingUp size={18} className="mr-1" />
-          ) : (
-            <TrendingDown size={18} className="mr-1" />
-          )}
-          <span className="font-medium">{changePercent}%</span>
-          <span className="text-gray-500 ml-1 text-sm">from last month</span>
-        </div>
+        {value ? (
+          <>
+            <div className="text-3xl font-bold text-gray-800">{value}</div>
+            <div className={`flex items-center mt-2 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+              {isPositive ? (
+                <TrendingUp size={18} className="mr-1" />
+              ) : (
+                <TrendingDown size={18} className="mr-1" />
+              )}
+              <span className="font-medium">{changePercent}%</span>
+              <span className="text-gray-500 ml-1 text-sm">from last month</span>
+            </div>
+          </>
+        ) : (
+          <div className="text-gray-400">No data available</div>
+        )}
       </div>
     </div>
   );
