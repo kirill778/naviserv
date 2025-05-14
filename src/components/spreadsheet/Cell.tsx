@@ -92,10 +92,11 @@ const Cell: React.FC<CellProps> = ({
   // Handle key press
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      e.preventDefault(); // Предотвращаем стандартное поведение (переход на новую строку)
+      
       if (isCellFormulaSource) {
         // Фиксируем формулу, режим формулы отменится в updateCellValue в store, если нужно
         updateCellValue(rowIndex, colIndex, inputValue);
-        // setEditingCell(null, null); // Убираем из режима редактирования
       } else {
         updateCellValue(rowIndex, colIndex, inputValue);
       }
@@ -146,7 +147,7 @@ const Cell: React.FC<CellProps> = ({
 
   // Generate classes based on state
   const getCellClasses = () => {
-    let classes = "min-w-[100px] w-[100px] h-10 border-b border-r border-gray-300 flex items-center overflow-hidden ";
+    let classes = "cell min-w-[100px] w-[100px] h-10 border-b border-r border-gray-300 flex items-center overflow-hidden ";
     if (isActive) {
       classes += "bg-blue-50 outline outline-2 outline-blue-500 z-10 ";
     } else if (isCellReferencedInFormula && isFormulaSelectionMode && !isCellFormulaSource) {

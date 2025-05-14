@@ -14,6 +14,8 @@ const FormulaBar: React.FC = () => {
     updateCurrentFormulaValue,
     startFormulaMode,
     insertFunctionTemplate,
+    setEditingCell,
+    updateCellValue,
   } = useSpreadsheetStore();
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,6 +42,26 @@ const FormulaBar: React.FC = () => {
         startFormulaMode(activeCell.row, activeCell.col, newValue);
       } else {
         useSpreadsheetStore.getState().updateCellValue(activeCell.row, activeCell.col, newValue);
+      }
+    }
+  };
+
+  // Обработчик нажатия клавиш
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Предотвращаем стандартное поведение
+      
+      // Если мы находимся в режиме формулы, применяем формулу и завершаем редактирование
+      if (isFormulaSelectionMode && formulaSourceCell && 
+          formulaSourceCell.row !== null && formulaSourceCell.col !== null) {
+        // Сохраняем текущее значение формулы в ячейке
+        updateCellValue(formulaSourceCell.row, formulaSourceCell.col, displayInputValue);
+        // Завершаем режим редактирования
+        setEditingCell(null, null);
+      } else if (activeCell.row !== null && activeCell.col !== null) {
+        // Обычное значение в ячейке
+        updateCellValue(activeCell.row, activeCell.col, displayInputValue);
+        setEditingCell(null, null);
       }
     }
   };
@@ -97,6 +119,7 @@ const FormulaBar: React.FC = () => {
             className="flex-1 h-8 px-2 outline-none border-none"
             value={displayInputValue}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             onFocus={() => {
               if (inputRef.current && isFormulaSelectionMode && formulaSourceCell && 
                   formulaSourceCell.row === activeCell.row && formulaSourceCell.col === activeCell.col) {

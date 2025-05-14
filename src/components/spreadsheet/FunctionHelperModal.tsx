@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useSpreadsheetStore from '../../stores/spreadsheetStore';
 
 interface FunctionDefinition {
@@ -33,14 +33,38 @@ const FunctionHelperModal: React.FC<FunctionHelperModalProps> = ({ isOpen, onClo
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFunction, setSelectedFunction] = useState<FunctionDefinition | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
 
+  // Define filteredFunctions here, so it's available for useEffect
+  const filteredFunctions = isOpen 
+    ? commonFunctions.filter(func => 
+        (selectedCategory === 'Все' || func.category === selectedCategory) &&
+        (func.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+         func.description.toLowerCase().includes(searchTerm.toLowerCase())))
+    : [];
+
+  // All hooks must be called unconditionally at the top level
+  useEffect(() => {
+    if (isOpen && filteredFunctions.length > 0 && selectedIndex === -1) {
+      setSelectedIndex(0);
+      setSelectedFunction(filteredFunctions[0]);
+    }
+  }, [filteredFunctions, selectedIndex, isOpen]);
+
+  const resetState = () => {
+    setSelectedCategory('Все');
+    setSearchTerm('');
+    setSelectedFunction(null);
+    setSelectedIndex(-1);
+  };
+
+  const handleClose = () => {
+    onClose();
+    resetState();
+  };
+
+  // Early return after all hooks are called
   if (!isOpen) return null;
-
-  const filteredFunctions = commonFunctions.filter(func => 
-    (selectedCategory === 'Все' || func.category === selectedCategory) &&
-    (func.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-     func.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
 
   const handleInsert = () => {
     if (selectedFunction) {
@@ -51,19 +75,36 @@ const FunctionHelperModal: React.FC<FunctionHelperModalProps> = ({ isOpen, onClo
     }
   };
 
-  const resetState = () => {
-    setSelectedCategory('Все');
-    setSearchTerm('');
-    setSelectedFunction(null);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedFunction) {
+        handleInsert();
+      } else if (selectedIndex >= 0 && selectedIndex < filteredFunctions.length) {
+        setSelectedFunction(filteredFunctions[selectedIndex]);
+        setTimeout(handleInsert, 0);
+      }
+    } else if (e.key === 'Escape') {
+      handleClose();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const newIndex = Math.min(selectedIndex + 1, filteredFunctions.length - 1);
+      setSelectedIndex(newIndex);
+      setSelectedFunction(filteredFunctions[newIndex]);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const newIndex = Math.max(selectedIndex - 1, 0);
+      setSelectedIndex(newIndex);
+      setSelectedFunction(filteredFunctions[newIndex]);
+    }
   };
 
-  const handleClose = () => {
-    onClose();
-    resetState();
-  }
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+    >
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Вставка функции</h2>
@@ -79,6 +120,7 @@ const FunctionHelperModal: React.FC<FunctionHelperModalProps> = ({ isOpen, onClo
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            autoFocus
           />
         </div>
 
@@ -98,12 +140,15 @@ const FunctionHelperModal: React.FC<FunctionHelperModalProps> = ({ isOpen, onClo
           <label className="block text-sm font-medium text-gray-700 p-2 sticky top-0 bg-gray-50 border-b">Выберите функцию:</label>
           <ul className="divide-y divide-gray-200">
             {filteredFunctions.length > 0 ? (
-              filteredFunctions.map(func => (
+              filteredFunctions.map((func, index) => (
                 <li 
                   key={func.name}
-                  onClick={() => setSelectedFunction(func)}
+                  onClick={() => {
+                    setSelectedFunction(func);
+                    setSelectedIndex(index);
+                  }}
                   className={`p-3 cursor-pointer hover:bg-blue-50 ${
-                    selectedFunction?.name === func.name ? 'bg-blue-100 ring-1 ring-blue-500' : ''
+                    index === selectedIndex ? 'bg-blue-100 ring-1 ring-blue-500' : ''
                   }`}
                 >
                   <div className="font-semibold text-blue-600">{func.name}</div>

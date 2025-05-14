@@ -20,6 +20,7 @@ const Spreadsheet: React.FC = () => {
     isFormulaSelectionMode,
     formulaSourceCell,
     selectCellForFormula,
+    cancelFormulaMode,
   } = useSpreadsheetStore();
   
   const tableRef = useRef<HTMLDivElement>(null);
@@ -150,6 +151,20 @@ const Spreadsheet: React.FC = () => {
     : Array.from({ length: effectiveRows }, () => 
         Array.from({ length: effectiveCols }, () => ''));
 
+  // Добавляем обработчик клика по таблице для завершения редактирования формулы
+  const handleTableClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Проверяем, не является ли цель клика ячейкой или внутренним элементом ячейки
+    const target = e.target as HTMLElement;
+    const isCell = target.closest('.cell') !== null || target.classList.contains('cell');
+    const isFormulaBar = target.closest('.formula-bar-controlled') !== null;
+    
+    // Если кликнули не по ячейке и не по панели формул, и при этом редактируется формула
+    if (!isCell && !isFormulaBar && editingCell !== null && isFormulaSelectionMode) {
+      // Завершаем редактирование формулы
+      setEditingCell(null, null);
+    }
+  };
+
   return (
     <div 
       ref={tableRef}
@@ -165,6 +180,7 @@ const Spreadsheet: React.FC = () => {
           }
         }
       }}
+      onClick={handleTableClick}
     >
       {isFormulaSelectionMode && (
         <div className="absolute top-0 left-0 right-0 bg-blue-100 text-blue-800 p-2 text-center z-20">
