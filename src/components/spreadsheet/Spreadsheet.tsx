@@ -1,44 +1,89 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Cell from './Cell';
 import useSpreadsheetStore from '../../stores/spreadsheetStore';
-import { evaluateFormula } from '../../utils/formulaUtils';
+import { evaluateFormula, extractCellRefs, cellRefToIndices } from '../../utils/formulaUtils';
 
 // Константы для размеров таблицы
-const DEFAULT_ROW_COUNT = 100; // Увеличиваем начальное количество строк
-const DEFAULT_COL_COUNT = 26; // Увеличиваем начальное количество столбцов
-const MIN_VISIBLE_ROWS = 100; // Минимальное количество видимых строк
-const MIN_VISIBLE_COLS = 26; // Минимальное количество видимых столбцов
+const DEFAULT_ROW_COUNT = 100;
+const DEFAULT_COL_COUNT = 26;
+const MIN_VISIBLE_ROWS = 100;
+const MIN_VISIBLE_COLS = 26;
 
 const Spreadsheet: React.FC = () => {
-  const { data, headers, activeCell, setActiveCell, updateCellValue } = useSpreadsheetStore();
-  const [editingCell, setEditingCell] = useState<string | null>(null);
+  const {
+    data,
+    headers,
+    activeCell,
+    setActiveCell,
+    editingCell,
+    setEditingCell,
+    isFormulaSelectionMode,
+    formulaSourceCell,
+    selectCellForFormula,
+  } = useSpreadsheetStore();
+  
   const tableRef = useRef<HTMLDivElement>(null);
   const [visibleRows, setVisibleRows] = useState(DEFAULT_ROW_COUNT);
   const [visibleCols, setVisibleCols] = useState(DEFAULT_COL_COUNT);
+  const [formulaReferencedCells, setFormulaReferencedCells] = useState<Array<[number, number]>>([]);
 
-  // Обработчик прокрутки для динамического добавления строк/столбцов
+  useEffect(() => {
+    const state = useSpreadsheetStore.getState();
+    if (state.isFormulaSelectionMode && state.formulaSourceCell) {
+      const cellValue = state.currentFormulaValue;
+      if (cellValue && cellValue.startsWith('=')) {
+        const refs = extractCellRefs(cellValue.substring(1));
+        const indices = refs.map(ref => {
+          try {
+            return cellRefToIndices(ref);
+          } catch (e) {
+            return null;
+          }
+        }).filter(Boolean) as Array<[number, number]>;
+        setFormulaReferencedCells(indices);
+      } else {
+        setFormulaReferencedCells([]);
+      }
+    } else {
+      setFormulaReferencedCells([]);
+    }
+    const unsubscribe = useSpreadsheetStore.subscribe(
+      (currentState) => {
+        if (currentState.isFormulaSelectionMode && currentState.formulaSourceCell) {
+          const val = currentState.currentFormulaValue;
+          if (val && val.startsWith('=')) {
+            const refs = extractCellRefs(val.substring(1));
+            const indices = refs.map(ref => {
+              try { return cellRefToIndices(ref); } catch (e) { return null; }
+            }).filter(Boolean) as Array<[number, number]>;
+            setFormulaReferencedCells(indices);
+          } else {
+            setFormulaReferencedCells([]);
+          }
+        } else {
+          setFormulaReferencedCells([]);
+        }
+      }
+    );
+    return unsubscribe;
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       if (tableRef.current) {
         const { scrollTop, scrollHeight, clientHeight, scrollLeft, scrollWidth, clientWidth } = tableRef.current;
-        
-        // Если прокрутили близко к концу по вертикали, добавляем еще строки
         if (scrollTop + clientHeight > scrollHeight - 200) {
           setVisibleRows(prev => prev + 20);
         }
-        
-        // Если прокрутили близко к концу по горизонтали, добавляем еще столбцы
         if (scrollLeft + clientWidth > scrollWidth - 200) {
           setVisibleCols(prev => prev + 5);
         }
       }
     };
-    
     const tableElement = tableRef.current;
     if (tableElement) {
       tableElement.addEventListener('scroll', handleScroll);
     }
-    
     return () => {
       if (tableElement) {
         tableElement.removeEventListener('scroll', handleScroll);
@@ -46,7 +91,6 @@ const Spreadsheet: React.FC = () => {
     };
   }, []);
 
-  // Generate column labels (A, B, C, ..., Z, AA, AB, ...)
   const generateColumnLabel = (index: number): string => {
     let label = '';
     let i = index;
@@ -57,23 +101,31 @@ const Spreadsheet: React.FC = () => {
     return label;
   };
 
-  // Handle cell click
+  const isCellReferencedInFormula = (rowIndex: number, colIndex: number): boolean => {
+    return formulaReferencedCells.some(([row, col]) => row === rowIndex && col === colIndex);
+  };
+
+  const isCellFormulaSource = (rowIndex: number, colIndex: number): boolean => {
+    return formulaSourceCell?.row === rowIndex && formulaSourceCell?.col === colIndex;
+  };
+
   const handleCellClick = (rowIndex: number, colIndex: number) => {
-    const cellId = `${rowIndex}-${colIndex}`;
+    const currentStoreState = useSpreadsheetStore.getState();
+    if (currentStoreState.isFormulaSelectionMode) {
+      if (!(currentStoreState.formulaSourceCell?.row === rowIndex && currentStoreState.formulaSourceCell?.col === colIndex)) {
+        selectCellForFormula(rowIndex, colIndex); 
+        return; 
+      }
+    }
+    
     setActiveCell(rowIndex, colIndex);
-    setEditingCell(cellId);
+    setEditingCell(rowIndex, colIndex);
   };
 
-  // Handle cell value change
-  const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
-    updateCellValue(rowIndex, colIndex, value);
-  };
-
-  // Get displayed value (evaluate formula if needed)
   const getDisplayValue = (value: string) => {
     if (typeof value === 'string' && value.startsWith('=')) {
       try {
-        return evaluateFormula(value.substring(1), data);
+        return evaluateFormula(value.substring(1), useSpreadsheetStore.getState().data);
       } catch (error) {
         return '#ERROR';
       }
@@ -81,8 +133,6 @@ const Spreadsheet: React.FC = () => {
     return value;
   };
 
-  // Определяем количество отображаемых строк и столбцов
-  // Учитываем имеющиеся данные и минимально необходимое количество
   const effectiveRows = Math.max(
     visibleRows,
     data.length > 0 ? data.length : MIN_VISIBLE_ROWS
@@ -93,7 +143,6 @@ const Spreadsheet: React.FC = () => {
     headers.length > 0 ? headers.length : MIN_VISIBLE_COLS
   );
 
-  // Создаем "бесконечную" таблицу
   const displayData = data.length > 0 
     ? Array.from({ length: effectiveRows }, (_, rowIdx) => 
         Array.from({ length: effectiveCols }, (_, colIdx) => 
@@ -104,9 +153,25 @@ const Spreadsheet: React.FC = () => {
   return (
     <div 
       ref={tableRef}
-      className="relative overflow-auto h-full"
+      className={`relative overflow-auto h-full ${isFormulaSelectionMode ? 'cursor-crosshair' : ''}`}
       tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && isFormulaSelectionMode) {
+          e.preventDefault();
+          useSpreadsheetStore.getState().cancelFormulaMode();
+          const currentEditingCell = useSpreadsheetStore.getState().editingCell;
+          if (currentEditingCell) {
+            setEditingCell(null,null);
+          }
+        }
+      }}
     >
+      {isFormulaSelectionMode && (
+        <div className="absolute top-0 left-0 right-0 bg-blue-100 text-blue-800 p-2 text-center z-20">
+          Кликните на ячейку, чтобы добавить ее в формулу, или продолжите ввод.
+        </div>
+      )}
+      
       <div className="sticky top-0 z-10 flex">
         <div className="w-10 h-10 bg-gray-100 border-b border-r border-gray-300 flex items-center justify-center text-gray-500 font-medium"></div>
         {Array(effectiveCols).fill(0).map((_, index) => (
@@ -132,10 +197,11 @@ const Spreadsheet: React.FC = () => {
               value={cell || ''}
               displayValue={getDisplayValue(cell || '')}
               isActive={activeCell.row === rowIndex && activeCell.col === colIndex}
-              isEditing={editingCell === `${rowIndex}-${colIndex}`}
+              isEditing={editingCell?.row === rowIndex && editingCell?.col === colIndex}
+              isFormulaSelectionMode={isFormulaSelectionMode}
+              isCellReferencedInFormula={isCellReferencedInFormula(rowIndex, colIndex)}
+              isCellFormulaSource={isCellFormulaSource(rowIndex, colIndex)}
               onClick={() => handleCellClick(rowIndex, colIndex)}
-              onChange={(value) => handleCellChange(rowIndex, colIndex, value)}
-              onBlur={() => setEditingCell(null)}
             />
           ))}
         </div>

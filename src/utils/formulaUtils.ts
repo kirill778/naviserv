@@ -26,6 +26,35 @@ export const cellRefToIndices = (cellRef: string): [number, number] => {
 };
 
 /**
+ * Convert array indices to cell reference
+ * E.g., [0, 0] => A1, [2, 1] => B3
+ */
+export const indicesToCellRef = (rowIndex: number, colIndex: number): string => {
+  // Convert column index to letter (0=A, 1=B, ..., 25=Z, 26=AA, ...)
+  let colRef = '';
+  let col = colIndex;
+  
+  do {
+    const remainder = col % 26;
+    colRef = String.fromCharCode(65 + remainder) + colRef;
+    col = Math.floor(col / 26) - 1;
+  } while (col >= 0);
+  
+  // Convert row index to number (0=1, 1=2, ...)
+  const rowRef = rowIndex + 1;
+  
+  return `${colRef}${rowRef}`;
+};
+
+/**
+ * Check if a string is a valid cell reference
+ */
+export const isValidCellRef = (cellRef: string): boolean => {
+  const cellRefPattern = /^[A-Z]+\d+$/;
+  return cellRefPattern.test(cellRef);
+};
+
+/**
  * Replace cell references with their values
  */
 export const replaceCellRefs = (formula: string, data: any[][]): string => {
@@ -43,7 +72,8 @@ export const replaceCellRefs = (formula: string, data: any[][]): string => {
       
       // If the value is a formula, recursively evaluate it
       if (typeof value === 'string' && value.startsWith('=')) {
-        return evaluateFormula(value.substring(1), data);
+        const result = evaluateFormula(value.substring(1), data);
+        return typeof result === 'number' ? result.toString() : result;
       }
       
       // Check if the value is numeric
@@ -62,10 +92,51 @@ export const replaceCellRefs = (formula: string, data: any[][]): string => {
 };
 
 /**
+ * Extract all cell references from a formula
+ */
+export const extractCellRefs = (formula: string): string[] => {
+  const cellRefPattern = /([A-Z]+\d+)/g;
+  const matches = formula.match(cellRefPattern);
+  return matches || [];
+};
+
+/**
  * Evaluate a formula
  */
 export const evaluateFormula = (formula: string, data: any[][]): string | number => {
   try {
+    // Проверка, есть ли операторы в формуле
+    if (!/[\+\-\*\/\(\)]/.test(formula)) {
+      // Формула без операторов, может быть просто ссылка на ячейку
+      const cellRefPattern = /^[A-Z]+\d+$/;
+      if (cellRefPattern.test(formula)) {
+        try {
+          const [rowIndex, colIndex] = cellRefToIndices(formula);
+          const value = data[rowIndex]?.[colIndex];
+          
+          if (value === undefined || value === null || value === '') {
+            return 0;
+          }
+          
+          // Если значение - формула, рекурсивно вычисляем
+          if (typeof value === 'string' && value.startsWith('=')) {
+            return evaluateFormula(value.substring(1), data);
+          }
+          
+          // Проверяем, является ли значение числом
+          const numValue = parseFloat(value);
+          if (!isNaN(numValue)) {
+            return numValue;
+          }
+          
+          return value;
+        } catch (error) {
+          return '#ERROR';
+        }
+      }
+    }
+    
+    // Обычная формула с операторами
     // Replace cell references with their values
     const processedFormula = replaceCellRefs(formula, data);
     

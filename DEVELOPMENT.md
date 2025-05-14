@@ -152,6 +152,137 @@
      },
      ```
 
+#### Детали реализации (17.05.2024):
+
+1. **Интерактивный выбор ячеек для формул:**
+   - Добавлена функциональность выбора ячеек для формул, аналогично Excel:
+     ```typescript
+     const startCellSelection = () => {
+       // Сохраняем текущую позицию курсора
+       if (inputRef.current) {
+         setCursorPosition(inputRef.current.selectionStart);
+       }
+       setIsSelectingCell(true);
+       // Сохраняем текущее состояние в localStorage
+       window.localStorage.setItem('formulaMode', JSON.stringify({
+         active: true,
+         sourceCell: { row: activeCell.row, col: activeCell.col },
+         cursorPosition: inputRef.current?.selectionStart || 0,
+         formulaValue: cellValue
+       }));
+     };
+     ```
+   
+   - В компоненте Spreadsheet добавлен режим выбора ячеек:
+     ```typescript
+     // Обработчик клика по ячейке в режиме выбора формулы
+     if (isFormulaSelectionMode) {
+       // Получаем данные формулы
+       const formulaData = window.localStorage.getItem('formulaMode');
+       if (formulaData) {
+         try {
+           const data = JSON.parse(formulaData);
+           // Обновляем данные с выбранной ячейкой
+           const updatedData = {
+             ...data,
+             active: false,
+             selectedCell: { row: rowIndex, col: colIndex }
+           };
+           // Сохраняем обновленные данные
+           window.localStorage.setItem('formulaMode', JSON.stringify(updatedData));
+           
+           // Возвращаемся к редактированию формулы
+           if (data.sourceCell) {
+             setActiveCell(data.sourceCell.row, data.sourceCell.col);
+             return;
+           }
+         } catch (e) {
+           console.error("Error parsing formula mode data", e);
+         }
+       }
+     }
+     ```
+
+   - Визуальные индикаторы режима выбора:
+     ```typescript
+     {isFormulaSelectionMode && (
+       <div className="absolute top-0 left-0 right-0 bg-blue-100 text-blue-800 p-2 text-center z-20">
+         Click on a cell to select it for your formula
+       </div>
+     )}
+     ```
+
+   - Обновлены утилиты для работы с формулами:
+     ```typescript
+     // Конвертация индексов в ссылки на ячейки (например, [0, 0] => A1)
+     export const indicesToCellRef = (rowIndex: number, colIndex: number): string => {
+       let colRef = '';
+       let col = colIndex;
+       
+       do {
+         const remainder = col % 26;
+         colRef = String.fromCharCode(65 + remainder) + colRef;
+         col = Math.floor(col / 26) - 1;
+       } while (col >= 0);
+       
+       const rowRef = rowIndex + 1;
+       
+       return `${colRef}${rowRef}`;
+     };
+     
+     // Проверка на валидность ссылки на ячейку
+     export const isValidCellRef = (cellRef: string): boolean => {
+       const cellRefPattern = /^[A-Z]+\d+$/;
+       return cellRefPattern.test(cellRef);
+     };
+     
+     // Извлечение всех ссылок на ячейки из формулы
+     export const extractCellRefs = (formula: string): string[] => {
+       const cellRefPattern = /([A-Z]+\d+)/g;
+       const matches = formula.match(cellRefPattern);
+       return matches || [];
+     };
+     ```
+
+2. **Обмен данными между компонентами:**
+   - Использован localStorage для коммуникации между компонентами:
+     ```typescript
+     // В FormulaBar.tsx (при выборе ячейки)
+     React.useEffect(() => {
+       const handleStorageChange = () => {
+         const formulaData = window.localStorage.getItem('formulaMode');
+         if (formulaData) {
+           try {
+             const data = JSON.parse(formulaData);
+             if (!data.active && data.selectedCell) {
+               // Режим формулы завершен
+               setIsSelectingCell(false);
+               
+               // Получаем ссылку на выбранную ячейку
+               const colLabel = String.fromCharCode(65 + data.selectedCell.col);
+               const cellRef = `${colLabel}${data.selectedCell.row + 1}`;
+               
+               // Вставляем ссылку на ячейку в позицию курсора
+               const formula = data.formulaValue || '';
+               const pos = data.cursorPosition || formula.length;
+               const newFormula = formula.substring(0, pos) + cellRef + formula.substring(pos);
+               
+               // Обновляем формулу
+               updateCellValue(activeCell.row, activeCell.col, newFormula);
+             }
+           } catch (e) {
+             console.error("Error parsing formula mode data", e);
+           }
+         }
+       };
+
+       window.addEventListener('storage', handleStorageChange);
+       return () => {
+         window.removeEventListener('storage', handleStorageChange);
+       };
+     }, [activeCell, updateCellValue]);
+     ```
+
 ## Решенные проблемы
 
 ### Проблемы с аутентификацией
