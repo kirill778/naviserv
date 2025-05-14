@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.bolt
+.gitignore
+README.md
+.DS_Store
+docker-compose.yml
+Dockerfile
+Dockerfile.dev
+nginx.conf
+.dockerignore 

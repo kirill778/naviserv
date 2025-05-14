@@ -21,6 +21,7 @@
 - Tailwind CSS
 - Zustand для управления состоянием
 - React Grid Layout для настраиваемых дашбордов
+- Docker для контейнеризации
 
 ## Начало работы
 
@@ -48,6 +49,34 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Запуск с использованием Docker
+
+Проект поддерживает запуск в Docker-контейнерах, что гарантирует одинаковое окружение на любой системе.
+
+### Запуск в режиме разработки (с горячей перезагрузкой)
+
+```bash
+docker-compose up app-dev
+```
+
+Приложение будет доступно по адресу [http://localhost:5173](http://localhost:5173)
+
+### Запуск в продакшн режиме
+
+```bash
+docker-compose up app-prod
+```
+
+Приложение будет доступно по адресу [http://localhost](http://localhost)
+
+### Остановка контейнеров
+
+```bash
+docker-compose down
+```
+
+Дополнительная информация о Docker-настройке доступна в [README.docker.md](README.docker.md).
 
 ## Использование
 

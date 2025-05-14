@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Копируем файлы зависимостей
+COPY package.json package-lock.json ./
+
+# Устанавливаем зависимости
+RUN npm ci
+
+# Устанавливаем права на папку node_modules
+RUN mkdir -p node_modules/.vite && chmod -R 777 node_modules/.vite
+
+# Настраиваем порт для Vite
+ENV VITE_PORT=5173
+ENV HOST=0.0.0.0
+
+# Открываем порт
+EXPOSE 5173
+
+# Запускаем приложение
+CMD ["npm", "run", "dev"] 
