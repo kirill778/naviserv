@@ -197,10 +197,8 @@ const Cell: React.FC<CellProps> = ({
         />
       ) : (
         <div 
-          className={`w-full h-full px-2 py-0 flex items-center ${
+          className={`w-full h-full px-2 py-0 flex items-center justify-center ${
             typeof value === 'string' && value.startsWith('=') ? 'text-black' : ''
-          } ${
-            typeof displayValue === 'number' ? 'justify-end' : ''
           }`}
         >
           <span className="truncate">{displayedContent}</span>
