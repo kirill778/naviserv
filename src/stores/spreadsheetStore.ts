@@ -29,6 +29,7 @@ interface SpreadsheetState extends FormulaModeState {
   isLoading: boolean; // Флаг, указывающий, что идет загрузка данных
   currentFile: FileInfo; // Информация о текущем файле
   errorMessage: string | null; // Сообщение об ошибке
+  columnWidths: { [key: number]: number }; // Ширины столбцов
 
   setData: (data: any[][], headers: string[]) => void;
   setActiveCell: (row: number, col: number) => void;
@@ -36,6 +37,15 @@ interface SpreadsheetState extends FormulaModeState {
   updateCellValue: (row: number, col: number, value: string) => void;
   getCellValue: (row: number, col: number) => string | null;
   clearCell: (row: number, col: number) => void;
+  setColumnWidth: (columnIndex: number, width: number) => void; // Установка ширины столбца
+
+  // Excel-like functions for manipulating rows and columns
+  insertRowAbove: (rowIndex: number) => void;
+  insertRowBelow: (rowIndex: number) => void;
+  deleteRow: (rowIndex: number) => void;
+  insertColumnLeft: (colIndex: number) => void;
+  insertColumnRight: (colIndex: number) => void;
+  deleteColumn: (colIndex: number) => void;
 
   // Formula mode actions
   startFormulaMode: (rowIndex: number, colIndex: number, initialValue?: string) => void;
@@ -60,6 +70,7 @@ const useSpreadsheetStore = create<SpreadsheetState>((set, get) => ({
   isLoading: false,
   currentFile: { id: null, name: null },
   errorMessage: null,
+  columnWidths: {}, // Пустой объект для хранения ширин столбцов
 
   // Formula mode initial state
   isFormulaSelectionMode: false,
@@ -115,6 +126,113 @@ const useSpreadsheetStore = create<SpreadsheetState>((set, get) => ({
       const newData = [...state.data.map(r => [...r])];
       newData[row][col] = '';
       return { data: newData };
+    });
+  },
+
+  // Excel-like functions for manipulating rows and columns
+  insertRowAbove: (rowIndex: number) => {
+    set((state) => {
+      const newData = [...state.data.map(r => [...r])];
+      // Create empty row
+      const emptyRow: any[] = Array(Math.max(state.headers.length, newData[0]?.length || 0)).fill('');
+      
+      // Insert the empty row at the specified index
+      newData.splice(rowIndex, 0, emptyRow);
+      
+      return { data: newData };
+    });
+  },
+  
+  insertRowBelow: (rowIndex: number) => {
+    set((state) => {
+      const newData = [...state.data.map(r => [...r])];
+      // Create empty row
+      const emptyRow: any[] = Array(Math.max(state.headers.length, newData[0]?.length || 0)).fill('');
+      
+      // Insert the empty row after the specified index
+      newData.splice(rowIndex + 1, 0, emptyRow);
+      
+      return { data: newData };
+    });
+  },
+  
+  deleteRow: (rowIndex: number) => {
+    set((state) => {
+      // Don't delete the last row to prevent having an empty dataset
+      if (state.data.length <= 1) {
+        return state;
+      }
+      
+      const newData = [...state.data.map(r => [...r])];
+      // Remove the specified row
+      newData.splice(rowIndex, 1);
+      
+      return { data: newData };
+    });
+  },
+  
+  insertColumnLeft: (colIndex: number) => {
+    set((state) => {
+      const newData = state.data.map(row => {
+        const newRow = [...row];
+        // Insert empty cell at specified column index
+        newRow.splice(colIndex, 0, '');
+        return newRow;
+      });
+      
+      // Also update headers
+      const newHeaders = [...state.headers];
+      newHeaders.splice(colIndex, 0, '');
+      
+      return { 
+        data: newData,
+        headers: newHeaders
+      };
+    });
+  },
+  
+  insertColumnRight: (colIndex: number) => {
+    set((state) => {
+      const newData = state.data.map(row => {
+        const newRow = [...row];
+        // Insert empty cell after specified column index
+        newRow.splice(colIndex + 1, 0, '');
+        return newRow;
+      });
+      
+      // Also update headers
+      const newHeaders = [...state.headers];
+      newHeaders.splice(colIndex + 1, 0, '');
+      
+      return { 
+        data: newData,
+        headers: newHeaders
+      };
+    });
+  },
+  
+  deleteColumn: (colIndex: number) => {
+    set((state) => {
+      // Don't delete the last column
+      if (state.headers.length <= 1) {
+        return state;
+      }
+      
+      const newData = state.data.map(row => {
+        const newRow = [...row];
+        // Remove the specified column
+        newRow.splice(colIndex, 1);
+        return newRow;
+      });
+      
+      // Also update headers
+      const newHeaders = [...state.headers];
+      newHeaders.splice(colIndex, 1);
+      
+      return { 
+        data: newData,
+        headers: newHeaders
+      };
     });
   },
 
@@ -392,6 +510,16 @@ const useSpreadsheetStore = create<SpreadsheetState>((set, get) => ({
 
   resetCurrentFile: () => {
     set({ currentFile: { id: null, name: null } });
+  },
+
+  // Функция для установки ширины столбца
+  setColumnWidth: (columnIndex, width) => {
+    set((state) => ({
+      columnWidths: {
+        ...state.columnWidths,
+        [columnIndex]: width,
+      }
+    }));
   },
 }));
 

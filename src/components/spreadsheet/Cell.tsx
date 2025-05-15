@@ -12,6 +12,8 @@ interface CellProps {
   isCellReferencedInFormula?: boolean;
   isCellFormulaSource?: boolean;
   onClick: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  width: number; // Ширина ячейки в пикселях
   // onChange и onBlur больше не нужны как props, Cell будет использовать store напрямую
 }
 
@@ -26,6 +28,8 @@ const Cell: React.FC<CellProps> = ({
   isCellReferencedInFormula = false,
   isCellFormulaSource = false,
   onClick,
+  onContextMenu,
+  width,
 }) => {
   // Получаем необходимые функции из хранилища
   const {
@@ -147,7 +151,7 @@ const Cell: React.FC<CellProps> = ({
 
   // Generate classes based on state
   const getCellClasses = () => {
-    let classes = "cell min-w-[100px] w-[100px] h-10 border-b border-r border-gray-300 flex items-center overflow-hidden ";
+    let classes = "cell border-b border-r border-gray-400 flex items-center overflow-hidden ";
     if (isActive) {
       classes += "bg-blue-50 outline outline-2 outline-blue-500 z-10 ";
     } else if (isCellReferencedInFormula && isFormulaSelectionMode && !isCellFormulaSource) {
@@ -173,26 +177,33 @@ const Cell: React.FC<CellProps> = ({
   return (
     <div
       className={getCellClasses()}
-      onClick={handleCellClick} // onClick из Spreadsheet теперь решит, что делать
+      style={{ 
+        minWidth: `${width}px`, 
+        width: `${width}px`,
+        height: '40px',
+        boxSizing: 'border-box'
+      }}
+      onClick={handleCellClick} 
+      onContextMenu={onContextMenu}
     >
       {isEditing ? (
         <input
           ref={inputRef}
           className="w-full h-full px-2 py-1 outline-none border-none bg-transparent"
-          value={inputValue} // Локальное состояние для input, синхронизированное
+          value={inputValue}
           onChange={handleInputChange}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
         />
       ) : (
         <div 
-          className={`w-full h-full px-2 py-1 truncate ${
+          className={`w-full h-full px-2 py-0 flex items-center ${
             typeof value === 'string' && value.startsWith('=') ? 'text-black' : ''
           } ${
-            typeof displayValue === 'number' ? 'text-right' : ''
+            typeof displayValue === 'number' ? 'justify-end' : ''
           }`}
         >
-          {displayedContent}
+          <span className="truncate">{displayedContent}</span>
         </div>
       )}
     </div>
