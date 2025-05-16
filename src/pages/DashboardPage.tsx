@@ -8,7 +8,9 @@ import {
   Download,
   Save,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  File,
+  PieChart as PieChartIcon
 } from 'lucide-react';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import ChartWidget from '../components/dashboard/ChartWidget';
@@ -91,6 +93,10 @@ const DashboardPage: React.FC = () => {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState<'table' | 'widget' | null>(null);
+  const [selectedExportWidget, setSelectedExportWidget] = useState<string | null>(null);
+  const [selectedExportTable, setSelectedExportTable] = useState<string | null>(null);
 
   // Функция для нормализации виджетов (убедиться, что y - это число)
   const normalizeWidgets = (widgetsToNormalize: Widget[]): Widget[] => {
@@ -273,8 +279,176 @@ const DashboardPage: React.FC = () => {
     setWidgets([]);
   };
 
-  // Export dashboard as PDF
-  const exportDashboard = async () => {
+  // Функция для открытия модального окна экспорта
+  const openExportModal = () => {
+    setShowExportModal(true);
+    setExportType(null);
+    setSelectedExportWidget(null);
+    setSelectedExportTable(null);
+  };
+
+  // Функция для экспорта таблицы в PDF
+  const exportTableToPdf = async (tableId: string) => {
+    try {
+      setIsExporting(true);
+      
+      const tableFileInfo = csvFiles.find(f => f.id.toString() === tableId);
+      if (!tableFileInfo) {
+        setErrorMessage('Таблица не найдена');
+        setIsExporting(false);
+        return;
+      }
+      
+      const response = await fetch(`${API_URL}/csv-files/content/${tableId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        setErrorMessage('Не удалось получить данные таблицы');
+        setIsExporting(false);
+        return;
+      }
+      
+      const tableData = await response.json();
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      
+      pdf.addFont('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf', 'Roboto', 'normal');
+      pdf.setFont('Roboto');
+      
+      const title = tableFileInfo.name || 'Таблица';
+      const date = new Date().toLocaleDateString('ru-RU');
+      
+      pdf.setFontSize(22);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(title, 14, 20);
+      pdf.setFontSize(12);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`Экспортировано: ${date}`, 14, 30);
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.5);
+      pdf.line(14, 35, 280, 35);
+      
+      if (tableData.headers && tableData.data) {
+        const maxColumns = Math.min(tableData.headers.length, 10);
+        const availableWidth = 270;
+        const colWidths = Array(maxColumns).fill(availableWidth / maxColumns);
+        
+        tableData.headers.slice(0, maxColumns).forEach((header: string, i: number) => {
+          const headerLength = String(header).length;
+          if (headerLength > 15) {
+            colWidths[i] = Math.min(availableWidth / 3, (headerLength / 15) * (availableWidth / maxColumns));
+          }
+        });
+        
+        const totalWidth = colWidths.reduce((sum, width) => sum + width, 0);
+        if (totalWidth > availableWidth) {
+          const ratio = availableWidth / totalWidth;
+          colWidths.forEach((_, i) => { colWidths[i] *= ratio; });
+        }
+        
+        const startY = 45;
+        const rowHeight = 10;
+        const padding = 3;
+        
+        const cleanText = (text: any): string => {
+          if (text === null || text === undefined) return '';
+          return String(text).replace(/[\u0080-\uFFFF]/g, char => String.fromCharCode(char.charCodeAt(0)));
+        };
+        
+        let currentX = 14;
+        pdf.setFillColor(240, 240, 240);
+        pdf.setDrawColor(180, 180, 180);
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFontSize(10);
+        
+        tableData.headers.slice(0, maxColumns).forEach((header: string, i: number) => {
+          const columnWidth = colWidths[i];
+          pdf.setFillColor(240, 240, 240); // Ensure header fill color
+          pdf.rect(currentX, startY, columnWidth, rowHeight, 'FD');
+          let headerText = cleanText(header);
+          if (headerText.length > 20) headerText = headerText.substring(0, 17) + '...';
+          pdf.setTextColor(0,0,0); // Ensure header text color
+          pdf.text(headerText, currentX + padding, startY + rowHeight - padding);
+          currentX += columnWidth;
+        });
+        
+        const maxRows = Math.min(tableData.data.length, 30);
+        
+        for (let rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+          const row = tableData.data[rowIndex];
+          currentX = 14;
+          const y = startY + (rowIndex + 1) * rowHeight;
+          
+          for (let colIndex = 0; colIndex < Math.min(row.length, maxColumns); colIndex++) {
+            const columnWidth = colWidths[colIndex];
+            
+            // CRITICAL FIX: Explicitly set fill color for each data cell before drawing rect
+            if (rowIndex % 2 === 0) {
+              pdf.setFillColor(250, 250, 250); // Light grey for even rows
+            } else {
+              pdf.setFillColor(255, 255, 255); // White for odd rows
+            }
+            pdf.setDrawColor(220, 220, 220); // Border color
+            pdf.rect(currentX, y, columnWidth, rowHeight, 'FD');
+            
+            let cellText = cleanText(row[colIndex]);
+            if (cellText.length > 20) cellText = cellText.substring(0, 17) + '...';
+            
+            pdf.setTextColor(0, 0, 0); // Ensure text is black
+            pdf.setFontSize(10); // Ensure font size for data cells
+
+            const isNumeric = !isNaN(parseFloat(cellText)) && isFinite(Number(cellText));
+            if (isNumeric) {
+              pdf.text(cellText, currentX + columnWidth - padding - pdf.getTextWidth(cellText), y + rowHeight - padding);
+            } else {
+              pdf.text(cellText, currentX + padding, y + rowHeight - padding);
+            }
+            currentX += columnWidth;
+          }
+        }
+        
+        if (tableData.data.length > maxRows) {
+          pdf.setFontSize(8);
+          pdf.setTextColor(100, 100, 100);
+          pdf.text(`* Показаны первые ${maxRows} из ${tableData.data.length} строк.`, 14, startY + (maxRows + 1) * rowHeight + 5);
+        }
+        
+        pdf.setFontSize(8);
+        pdf.setTextColor(120, 120, 120);
+        pdf.text(`Всего столбцов: ${tableData.headers.length}, Всего строк: ${tableData.data.length}`, 14, 190);
+        pdf.text(`Дашборд: ${currentDashboard?.name || 'Не указан'}`, 14, 195);
+      }
+      
+      pdf.save(`${title}_${date.replace(/\./g, '-')}.pdf`);
+      setSuccessMessage('Таблица успешно экспортирована в PDF!');
+    } catch (error) {
+      console.error('Ошибка при экспорте таблицы:', error);
+      setErrorMessage('Не удалось экспортировать таблицу в PDF');
+    } finally {
+      setIsExporting(false);
+      setShowExportModal(false);
+    }
+  };
+
+  // Запуск экспорта в зависимости от выбранного типа
+  const handleExport = () => {
+    if (exportType === 'widget' && selectedExportWidget) {
+      // Находим виджет по ID
+      const widget = widgets.find(w => w.i === selectedExportWidget);
+      if (widget) {
+        exportDashboard(widget);
+      } else {
+        setErrorMessage('Выбранный виджет не найден');
+      }
+    } else if (exportType === 'table' && selectedExportTable) {
+      exportTableToPdf(selectedExportTable);
+    } else {
+      setErrorMessage('Пожалуйста, выберите элемент для экспорта');
+    }
+  };
+  
+  // Export dashboard as PDF - обновляем, чтобы принимать конкретный виджет
+  const exportDashboard = async (specificWidget?: Widget) => {
     try {
       // Включаем режим экспорта
       setIsExporting(true);
@@ -283,17 +457,30 @@ const DashboardPage: React.FC = () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Проверяем, есть ли виджеты для экспорта
-      if (widgets.length === 0) {
+      if (widgets.length === 0 && !specificWidget) {
         setErrorMessage('Нет виджетов для экспорта. Добавьте хотя бы один виджет.');
         setIsExporting(false);
         return;
       }
       
+      // ID виджета, который мы ищем (если указан конкретный)
+      const widgetId = specificWidget?.i;
+      
+      // Находим элемент виджета, если указан конкретный
+      let elementToSearch: Element | Document = document;
+      if (widgetId) {
+        const widgetElem = document.querySelector(`[data-grid-id="${widgetId}"]`) || 
+                         document.querySelector(`[data-grid*="${widgetId}"]`);
+        if (widgetElem) {
+          elementToSearch = widgetElem;
+        }
+      }
+      
       // Находим непосредственно элемент графика (SVG в Recharts)
       // Ищем его внутри виджета
-      const chartSvg = document.querySelector('.recharts-wrapper svg');
-      const chartCanvas = document.querySelector('.recharts-surface');
-      const pieChart = document.querySelector('.recharts-pie');
+      const chartSvg = elementToSearch.querySelector('.recharts-wrapper svg');
+      const chartCanvas = elementToSearch.querySelector('.recharts-surface');
+      const pieChart = elementToSearch.querySelector('.recharts-pie');
       
       // Какой элемент использовать для экспорта
       let elementToCapture = null;
@@ -310,7 +497,10 @@ const DashboardPage: React.FC = () => {
         elementToCapture = pieChart.closest('.recharts-wrapper') || pieChart;
       } else {
         // Пробуем найти контейнер виджета как запасной вариант
-        elementToCapture = document.querySelector('.react-grid-item')?.querySelector('.flex-1');
+        const widgetSelector = widgetId ? 
+          `[data-grid-id="${widgetId}"] .flex-1, [data-grid*="${widgetId}"] .flex-1` : 
+          '.react-grid-item .flex-1';
+        elementToCapture = document.querySelector(widgetSelector);
         console.log("Используется запасной контейнер");
       }
       
@@ -321,7 +511,7 @@ const DashboardPage: React.FC = () => {
       }
       
       // Создаем заголовок для PDF файла
-      const widgetTitle = widgets[0].title || 'Виджет';
+      const widgetTitle = specificWidget?.title || widgets[0]?.title || 'Виджет';
       const date = new Date().toLocaleDateString('ru-RU');
       
       // Получаем размеры элемента для сохранения пропорций
@@ -417,6 +607,7 @@ const DashboardPage: React.FC = () => {
       setErrorMessage('Не удалось экспортировать виджет в PDF');
     } finally {
       setIsExporting(false);
+      setShowExportModal(false);
     }
   };
 
@@ -558,7 +749,7 @@ const DashboardPage: React.FC = () => {
           </button>
           <button 
             className="flex items-center px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-            onClick={exportDashboard}
+            onClick={openExportModal}
           >
             <Download size={16} className="mr-1" />
             Экспорт в PDF
@@ -833,6 +1024,133 @@ const DashboardPage: React.FC = () => {
                 disabled={!dashboardName.trim() || isSaving}
               >
                 {isSaving ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно выбора для экспорта */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Экспорт в PDF</h2>
+            
+            <div className="mb-4">
+              <h3 className="text-lg font-medium mb-2">Что экспортировать?</h3>
+              <div className="flex space-x-3">
+                <button 
+                  className={`px-4 py-2 flex-1 border rounded-md flex items-center justify-center ${
+                    exportType === 'widget' ? 'bg-blue-100 border-blue-500' : 'border-gray-300'
+                  }`}
+                  onClick={() => setExportType('widget')}
+                >
+                  <PieChartIcon size={16} className="mr-2" />
+                  Виджет
+                </button>
+                <button 
+                  className={`px-4 py-2 flex-1 border rounded-md flex items-center justify-center ${
+                    exportType === 'table' ? 'bg-blue-100 border-blue-500' : 'border-gray-300'
+                  }`}
+                  onClick={() => setExportType('table')}
+                >
+                  <File size={16} className="mr-2" />
+                  Таблицу
+                </button>
+              </div>
+            </div>
+            
+            {exportType === 'widget' && (
+              <div className="mb-4">
+                <h3 className="text-sm font-medium mb-2">Выберите виджет:</h3>
+                <select 
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  value={selectedExportWidget || ''}
+                  onChange={(e) => setSelectedExportWidget(e.target.value)}
+                >
+                  <option value="">-- Выберите виджет --</option>
+                  {widgets.map(widget => (
+                    <option key={widget.i} value={widget.i}>{widget.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
+            {exportType === 'table' && (
+              <div>
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium mb-2">Выберите таблицу:</h3>
+                  <select 
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={selectedExportTable || ''}
+                    onChange={(e) => setSelectedExportTable(e.target.value)}
+                  >
+                    <option value="">-- Выберите таблицу --</option>
+                    {csvFiles.map(file => (
+                      <option key={file.id} value={file.id}>{file.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="bg-gray-50 p-3 rounded-md mb-4">
+                  <h4 className="text-xs font-medium mb-2 text-gray-700">Настройки экспорта таблицы:</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center">
+                      <input 
+                        id="show-headers" 
+                        type="checkbox"
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        defaultChecked={true}
+                      />
+                      <label htmlFor="show-headers" className="ml-2 block text-xs text-gray-700">
+                        Показывать заголовки
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input 
+                        id="alt-row-colors" 
+                        type="checkbox"
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        defaultChecked={true}
+                      />
+                      <label htmlFor="alt-row-colors" className="ml-2 block text-xs text-gray-700">
+                        Чередовать цвета строк
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button 
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => setShowExportModal(false)}
+              >
+                Отмена
+              </button>
+              <button 
+                className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 ${
+                  (exportType === 'widget' && !selectedExportWidget) || 
+                  (exportType === 'table' && !selectedExportTable) || 
+                  !exportType || isExporting
+                    ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                onClick={handleExport}
+                disabled={
+                  (exportType === 'widget' && !selectedExportWidget) || 
+                  (exportType === 'table' && !selectedExportTable) || 
+                  !exportType || isExporting
+                }
+              >
+                {isExporting ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1 inline-block"></div>
+                    Экспортирую...
+                  </>
+                ) : (
+                  'Экспортировать'
+                )}
               </button>
             </div>
           </div>
