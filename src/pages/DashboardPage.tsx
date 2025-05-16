@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   BarChart, 
   LineChart, 
@@ -16,6 +16,8 @@ import MetricWidget from '../components/dashboard/MetricWidget';
 import TableWidget from '../components/dashboard/TableWidget';
 import { API_URL } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { toPng } from 'html-to-image';
+import jsPDF from 'jspdf';
 
 // Интерфейс для элементов виджетов
 interface Widget {
@@ -86,6 +88,9 @@ const DashboardPage: React.FC = () => {
   const [isPublic, setIsPublic] = useState(false);
   
   const { token, user } = useAuthStore();
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // Функция для нормализации виджетов (убедиться, что y - это число)
   const normalizeWidgets = (widgetsToNormalize: Widget[]): Widget[] => {
@@ -269,9 +274,150 @@ const DashboardPage: React.FC = () => {
   };
 
   // Export dashboard as PDF
-  const exportDashboard = () => {
-    alert('Exporting dashboard to PDF...');
-    // In a real implementation, we would use jspdf and html-to-image
+  const exportDashboard = async () => {
+    try {
+      // Включаем режим экспорта
+      setIsExporting(true);
+      
+      // Даем время на рендеринг виджетов
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Проверяем, есть ли виджеты для экспорта
+      if (widgets.length === 0) {
+        setErrorMessage('Нет виджетов для экспорта. Добавьте хотя бы один виджет.');
+        setIsExporting(false);
+        return;
+      }
+      
+      // Находим непосредственно элемент графика (SVG в Recharts)
+      // Ищем его внутри виджета
+      const chartSvg = document.querySelector('.recharts-wrapper svg');
+      const chartCanvas = document.querySelector('.recharts-surface');
+      const pieChart = document.querySelector('.recharts-pie');
+      
+      // Какой элемент использовать для экспорта
+      let elementToCapture = null;
+      
+      // Определяем, что мы нашли из графиков
+      if (chartSvg) {
+        console.log("Найден SVG график");
+        elementToCapture = chartSvg.closest('.recharts-wrapper') || chartSvg;
+      } else if (chartCanvas) {
+        console.log("Найден Canvas график");
+        elementToCapture = chartCanvas.closest('.recharts-wrapper') || chartCanvas;
+      } else if (pieChart) {
+        console.log("Найден Pie график");
+        elementToCapture = pieChart.closest('.recharts-wrapper') || pieChart;
+      } else {
+        // Пробуем найти контейнер виджета как запасной вариант
+        elementToCapture = document.querySelector('.react-grid-item')?.querySelector('.flex-1');
+        console.log("Используется запасной контейнер");
+      }
+      
+      if (!elementToCapture) {
+        setErrorMessage('Не удалось найти график для экспорта.');
+        setIsExporting(false);
+        return;
+      }
+      
+      // Создаем заголовок для PDF файла
+      const widgetTitle = widgets[0].title || 'Виджет';
+      const date = new Date().toLocaleDateString('ru-RU');
+      
+      // Получаем размеры элемента для сохранения пропорций
+      const { width, height } = (elementToCapture as HTMLElement).getBoundingClientRect();
+      
+      // Увеличиваем размер для лучшего качества (если размер слишком мал)
+      const captureWidth = Math.max(width, 500);
+      const captureHeight = Math.max(height, 400);
+      const aspectRatio = width / height;
+      
+      console.log(`Размеры оригинала: ${width}x${height}, пропорция: ${aspectRatio}`);
+      
+      try {
+        // Получаем изображение графика
+        const dataUrl = await toPng(elementToCapture as HTMLElement, { 
+          quality: 0.95,
+          cacheBust: true,
+          pixelRatio: 2,
+          backgroundColor: 'white',
+          width: captureWidth,
+          height: captureHeight
+        });
+        
+        // Создаем PDF документ
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4'
+        });
+        
+        // Создаем заголовок PDF с названием виджета
+        const canvas = document.createElement('canvas');
+        canvas.width = 1000;
+        canvas.height = 100;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+          ctx.fillStyle = 'white';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = 'black';
+          ctx.font = 'bold 40px Arial';
+          ctx.fillText(widgetTitle, 10, 50);
+          ctx.font = '24px Arial';
+          ctx.fillText(`Экспортировано: ${date}`, 10, 80);
+          
+          const headerDataUrl = canvas.toDataURL('image/png');
+          pdf.addImage(headerDataUrl, 'PNG', 10, 10, 270, 25);
+        }
+        
+        // Рассчитываем размеры для вставки изображения на всю страницу
+        // Размер A4 в альбомной ориентации: 297×210 мм
+        // Оставляем минимальные поля и место для заголовка
+        const pageWidth = 297;
+        const pageHeight = 210;
+        const marginLeft = 5;
+        const marginTop = 35; // место под заголовок
+        const marginRight = 5;
+        const marginBottom = 5;
+        
+        // Используем максимальную доступную ширину и высоту
+        const availableWidth = pageWidth - marginLeft - marginRight;
+        const availableHeight = pageHeight - marginTop - marginBottom;
+        
+        // Определяем, что ограничивает больше - ширина или высота
+        let finalWidth, finalHeight;
+        
+        if (availableWidth / availableHeight > aspectRatio) {
+          // Высота ограничивает, используем всю доступную высоту
+          finalHeight = availableHeight;
+          finalWidth = availableHeight * aspectRatio;
+        } else {
+          // Ширина ограничивает, используем всю доступную ширину
+          finalWidth = availableWidth;
+          finalHeight = availableWidth / aspectRatio;
+        }
+        
+        // Центрируем изображение по горизонтали
+        const leftPosition = marginLeft + (availableWidth - finalWidth) / 2;
+        
+        // Добавляем изображение виджета
+        pdf.addImage(dataUrl, 'PNG', leftPosition, marginTop, finalWidth, finalHeight);
+        
+        // Сохраняем документ
+        pdf.save(`Widget_export_${date.replace(/\./g, '-')}.pdf`);
+        
+        setSuccessMessage('Виджет успешно экспортирован в PDF!');
+      } catch (exportError) {
+        console.error('Ошибка при создании изображения:', exportError);
+        setErrorMessage('Не удалось создать изображение графика');
+      }
+    } catch (error) {
+      console.error('Ошибка при экспорте виджета:', error);
+      setErrorMessage('Не удалось экспортировать виджет в PDF');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Функция сохранения дашборда
@@ -509,21 +655,24 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
       
-      <div className="flex-1 overflow-auto bg-gray-50 rounded-lg border border-gray-200 p-4">
-        {isLoading ? (
+      <div 
+        ref={dashboardRef}
+        className="flex-1 overflow-auto bg-gray-50 rounded-lg border border-gray-200 p-4"
+      >
+        {isLoading && !isExporting ? (
           <div className="h-full flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-2 text-gray-600">Загрузка...</span>
           </div>
         ) : (
-          <>
+          <div className="dashboard-content" ref={contentRef}>
             <ResponsiveGridLayout
               className="layout"
               breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
               cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
               rowHeight={40}
-              isDraggable={true}
-              isResizable={true}
+              isDraggable={!isExporting}
+              isResizable={!isExporting}
             >
               {widgets.map(widget => (
                 <div key={widget.i} data-grid={widget}>
@@ -547,7 +696,7 @@ const DashboardPage: React.FC = () => {
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
       
